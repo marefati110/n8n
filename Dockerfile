@@ -10,8 +10,8 @@ FROM n8nio/base:${NODE_VERSION} AS builder
 #–––– Context & Caching ––––#
 WORKDIR /src
 
-# Install pnpm via Corepack (Node 22 ships Corepack but disabled)
-RUN corepack enable \
+# Install pnpm via Corepack
+RUN corepack enable pnpm \
     && corepack prepare pnpm@10.22.0 --activate
 
 COPY . /src
