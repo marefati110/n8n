@@ -22,14 +22,12 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     && pnpm build
 
 #–––– Slim down the tree ––––#
-RUN jq 'del(.pnpm.patchedDependencies)' package.json > package.json.tmp && mv package.json.tmp package.json \
-    # Run the trim script only if it exists (repo forks may omit .github folder)
+RUN node -e "const pkg=require('./package.json'); if(pkg.pnpm) delete pkg.pnpm.patchedDependencies; require('fs').writeFileSync('package.json', JSON.stringify(pkg,null,2))" \
     && if [ -f .github/scripts/trim-fe-packageJson.js ]; then \
          node .github/scripts/trim-fe-packageJson.js; \
        else \
          echo "trim-fe-packageJson.js not found – skipping"; \
        fi \
-    # Remove TS, sourcemaps, Vue SFCs, etc. to shrink final image size
     && find . -type f \( -name "*.ts" -o -name "*.js.map" -o -name "*.vue" -o -name "tsconfig.json" -o -name "*.tsbuildinfo" \) -delete
 
 # Deploy only the n8n package (+ its prod deps) into /compiled
