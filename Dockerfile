@@ -42,8 +42,7 @@ FROM n8nio/base:${NODE_VERSION}
 ENV NODE_ENV=production \
     N8N_PORT=5678 \
 		N8N_RELEASE_TYPE=stable \
-		NODE_FUNCTION_ALLOW_EXTERNAL=moment-jalaali,bcrypt,bcryptjs \
-		NODE_PATH=/usr/local/lib/node_modules/n8n-external:/usr/local/lib/node_modules \
+		NODE_FUNCTION_ALLOW_EXTERNAL=moment-jalaali,ejs,axios,bcrypt,bcryptjs \		NODE_PATH=/usr/local/lib/node_modules/n8n-external:/usr/local/lib/node_modules \
 		N8N_LICENSE_ENDPOINT=http://localhost:3000
 		
 
@@ -56,7 +55,7 @@ RUN npm install -g moment-jalaali && \
     mkdir -p /usr/local/lib/node_modules/n8n-external && \
     cd /usr/local/lib/node_modules/n8n-external && \
     npm init -y && \
-    npm install moment-jalaali bcrypt bcryptjs && \
+    npm install moment-jalaali ejs axios bcrypt bcryptjs && \
     cd -
 # Install community nodes
 RUN mkdir -p /home/node/.n8n/nodes/node_modules && \
