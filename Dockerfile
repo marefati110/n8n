@@ -41,10 +41,9 @@ FROM n8nio/base:${NODE_VERSION}
 
 ENV NODE_ENV=production \
     N8N_PORT=5678 \
-		N8N_RELEASE_TYPE=stable \
-		NODE_FUNCTION_ALLOW_EXTERNAL=moment-jalaali,ejs,axios,bcrypt,bcryptjs \		NODE_PATH=/usr/local/lib/node_modules/n8n-external:/usr/local/lib/node_modules \
-		N8N_LICENSE_ENDPOINT=http://localhost:3000
-		
+    N8N_RELEASE_TYPE=stable \
+    NODE_FUNCTION_ALLOW_EXTERNAL=moment-jalaali,ejs,axios,bcrypt,bcryptjs \
+    NODE_PATH=/usr/local/lib/node_modules/n8n-external:/usr/local/lib/node_modules
 
 WORKDIR /home/node
 
@@ -78,7 +77,7 @@ RUN set -eux; \
     tar xvf task-runner-launcher-${LAUNCHER_VERSION}-linux-amd64.tar.gz --directory=/usr/local/bin && \
     cd - && rm -rf /launcher-temp
 
-    
+
 # Rebuild native bindings (sqlite3) for the final image libc
 RUN cd /usr/local/lib/node_modules/n8n && npm rebuild sqlite3 && cd -
 
