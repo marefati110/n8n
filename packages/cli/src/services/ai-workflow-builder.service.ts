@@ -19,6 +19,7 @@ import type {
 import { N8N_VERSION } from '@/constants';
 import { License } from '@/license';
 import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
+import { WorkflowBuilderSessionRepository } from '@/modules/workflow-builder';
 import { Push } from '@/push';
 import { DynamicNodeParametersService } from '@/services/dynamic-node-parameters.service';
 import { UrlService } from '@/services/url.service';
@@ -47,6 +48,7 @@ export class WorkflowBuilderService {
 		private readonly telemetry: Telemetry,
 		private readonly instanceSettings: InstanceSettings,
 		private readonly dynamicNodeParametersService: DynamicNodeParametersService,
+		private readonly sessionRepository: WorkflowBuilderSessionRepository,
 	) {
 		// Register a post-processor to update node types when they change.
 		// This ensures newly installed/updated/uninstalled community packages are recognized
@@ -148,6 +150,7 @@ export class WorkflowBuilderService {
 
 		this.service = new AiWorkflowBuilderService(
 			nodeTypeDescriptions,
+			this.sessionRepository,
 			this.client,
 			this.logger,
 			this.instanceSettings.instanceId,
@@ -184,9 +187,9 @@ export class WorkflowBuilderService {
 		yield* service.chat(payload, user, abortSignal);
 	}
 
-	async getSessions(workflowId: string | undefined, user: IUser, codeBuilder?: boolean) {
+	async getSessions(workflowId: string | undefined, user: IUser) {
 		const service = await this.getService();
-		const sessions = await service.getSessions(workflowId, user, codeBuilder);
+		const sessions = await service.getSessions(workflowId, user);
 		return sessions;
 	}
 
@@ -195,13 +198,18 @@ export class WorkflowBuilderService {
 		return await service.getBuilderInstanceCredits(user);
 	}
 
+	async clearSession(workflowId: string, user: IUser): Promise<void> {
+		const service = await this.getService();
+		await service.clearSession(workflowId, user);
+	}
+
 	async truncateMessagesAfter(
 		workflowId: string,
 		user: IUser,
 		messageId: string,
-		codeBuilder?: boolean,
+		versionCardId?: string,
 	): Promise<boolean> {
 		const service = await this.getService();
-		return await service.truncateMessagesAfter(workflowId, user, messageId, codeBuilder);
+		return await service.truncateMessagesAfter(workflowId, user, messageId, versionCardId);
 	}
 }

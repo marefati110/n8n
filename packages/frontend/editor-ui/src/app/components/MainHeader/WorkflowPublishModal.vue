@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, h, onMounted, onBeforeUnmount, useTemplateRef } from 'vue';
+import {
+	computed,
+	ref,
+	h,
+	onMounted,
+	onBeforeUnmount,
+	useTemplateRef,
+	type DeepReadonly,
+} from 'vue';
 import type { VNode } from 'vue';
 import Modal from '@/app/components/Modal.vue';
 import { WORKFLOW_PUBLISH_MODAL_KEY } from '@/app/constants';
@@ -14,16 +22,25 @@ import { useToast } from '@/app/composables/useToast';
 import { useWorkflowActivate } from '@/app/composables/useWorkflowActivate';
 import { useCredentialsStore } from '@/features/credentials/credentials.store';
 import { OPEN_AI_API_CREDENTIAL_TYPE } from 'n8n-workflow';
+import { useSettingsStore } from '@/app/stores/settings.store';
 import type { INodeUi } from '@/Interface';
 import type { IUsedCredential } from '@/features/credentials/credentials.types';
 import WorkflowActivationErrorMessage from '@/app/components/WorkflowActivationErrorMessage.vue';
-import { generateVersionName } from '@/features/workflows/workflowHistory/utils';
+import {
+	useWorkflowDocumentStore,
+	createWorkflowDocumentId,
+} from '@/app/stores/workflowDocument.store';
+import { generateVersionLabelFromId } from '@/features/workflows/workflowHistory/utils';
 
 const modalBus = createEventBus();
 const i18n = useI18n();
 
 const workflowsStore = useWorkflowsStore();
+const workflowDocumentStore = computed(() =>
+	useWorkflowDocumentStore(createWorkflowDocumentId(workflowsStore.workflow.id)),
+);
 const credentialsStore = useCredentialsStore();
+const settingsStore = useSettingsStore();
 const { showMessage } = useToast();
 const workflowActivate = useWorkflowActivate();
 const publishing = ref(false);
@@ -42,7 +59,9 @@ const containsTrigger = computed((): boolean => {
 });
 
 const wfHasAnyChanges = computed(() => {
-	return workflowsStore.workflow.versionId !== workflowsStore.workflow.activeVersion?.versionId;
+	return (
+		workflowDocumentStore.value?.versionId !== workflowDocumentStore.value?.activeVersion?.versionId
+	);
 });
 
 const hasNodeIssues = computed(() => workflowsStore.nodesIssuesExist);
@@ -80,18 +99,18 @@ function onModalOpened() {
 }
 
 onMounted(() => {
-	const versionData = workflowsStore.versionData;
+	const currentVersionData = workflowDocumentStore.value?.versionData;
 
 	if (!versionName.value) {
-		if (versionData?.name) {
-			versionName.value = versionData.name;
+		if (currentVersionData?.name) {
+			versionName.value = currentVersionData.name;
 		} else {
-			versionName.value = generateVersionName(workflowsStore.workflow.versionId);
+			versionName.value = generateVersionLabelFromId(workflowDocumentStore.value?.versionId ?? '');
 		}
 	}
 
-	if (!description.value && versionData?.description) {
-		description.value = versionData.description;
+	if (!description.value && currentVersionData?.description) {
+		description.value = currentVersionData.description;
 	}
 
 	modalBus.on('opened', onModalOpened);
@@ -102,7 +121,7 @@ onBeforeUnmount(() => {
 });
 
 function findManagedOpenAiCredentialId(
-	usedCredentials: Record<string, IUsedCredential>,
+	usedCredentials: DeepReadonly<Record<string, IUsedCredential>>,
 ): string | undefined {
 	return Object.keys(usedCredentials).find((credentialId) => {
 		const credential = credentialsStore.state.credentials[credentialId];
@@ -127,14 +146,30 @@ function hasActiveNodeUsingCredential(nodes: INodeUi[], credentialId: string): b
  *
  */
 const shouldShowFreeAiCreditsWarning = computed((): boolean => {
-	const usedCredentials = workflowsStore?.usedCredentials;
+	const usedCredentials = workflowDocumentStore.value?.usedCredentials;
 	if (!usedCredentials) return false;
 
 	const managedOpenAiCredentialId = findManagedOpenAiCredentialId(usedCredentials);
 	if (!managedOpenAiCredentialId) return false;
 
-	return hasActiveNodeUsingCredential(workflowsStore.allNodes, managedOpenAiCredentialId);
+	return hasActiveNodeUsingCredential(
+		workflowDocumentStore.value?.allNodes ?? [],
+		managedOpenAiCredentialId,
+	);
 });
+
+const aiGatewayWarningNodes = computed((): INodeUi[] => {
+	if (!settingsStore.isAiGatewayEnabled) return [];
+	return workflowsStore.allNodes.filter(
+		(node) =>
+			!node.disabled &&
+			Object.values(node.credentials ?? {}).some((cred) => cred.__aiGatewayManaged === true),
+	);
+});
+
+const aiGatewayWarningNodeNames = computed(() =>
+	aiGatewayWarningNodes.value.map((n) => n.name).join(', '),
+);
 
 async function displayActivationError() {
 	let errorMessage: string | VNode;
@@ -174,7 +209,7 @@ async function handlePublish() {
 	// Activate the workflow
 	const { success, errorHandled } = await workflowActivate.publishWorkflow(
 		workflowsStore.workflow.id,
-		workflowsStore.workflow.versionId,
+		workflowDocumentStore.value?.versionId ?? '',
 		{
 			name: versionName.value,
 			description: description.value,
@@ -182,8 +217,8 @@ async function handlePublish() {
 	);
 
 	if (success) {
-		workflowsStore.setWorkflowVersionData({
-			versionId: workflowsStore.workflow.versionId,
+		workflowDocumentStore.value?.setVersionData({
+			versionId: workflowDocumentStore.value?.versionId ?? '',
 			name: versionName.value,
 			description: description.value,
 		});
@@ -230,6 +265,24 @@ async function handlePublish() {
 		</template>
 		<template #content>
 			<div :class="$style.content">
+				<N8nCallout
+					v-if="aiGatewayWarningNodes.length > 0"
+					theme="warning"
+					:iconless="true"
+					data-test-id="workflow-publish-ai-gateway-warning"
+				>
+					{{
+						i18n.baseText('workflows.publishModal.aiGatewayWarning.header', {
+							adjustToNumber: aiGatewayWarningNodes.length,
+						})
+					}}
+					<strong>{{ aiGatewayWarningNodeNames }}</strong>
+					{{
+						i18n.baseText('workflows.publishModal.aiGatewayWarning.body', {
+							adjustToNumber: aiGatewayWarningNodes.length,
+						})
+					}}
+				</N8nCallout>
 				<N8nCallout v-if="activeCalloutId === 'noTrigger'" theme="danger" icon="status-error">
 					{{ i18n.baseText('workflows.publishModal.noTriggerMessage') }}
 				</N8nCallout>

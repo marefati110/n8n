@@ -6,7 +6,6 @@ import { createTestingPinia } from '@pinia/testing';
 import { setActivePinia } from 'pinia';
 import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { useWorkflowsListStore } from '@/app/stores/workflowsList.store';
-import { useWorkflowsEEStore } from '@/app/stores/workflows.ee.store';
 import { useTagsStore } from '@/features/shared/tags/tags.store';
 import { useUIStore } from '@/app/stores/ui.store';
 import {
@@ -35,9 +34,9 @@ import {
 	type WorkflowState,
 } from '@/app/composables/useWorkflowState';
 import {
-	createWorkflowDocumentId,
 	useWorkflowDocumentStore,
-} from '../stores/workflowDocument.store';
+	createWorkflowDocumentId,
+} from '@/app/stores/workflowDocument.store';
 
 vi.mock('@/app/composables/useWorkflowState', async () => {
 	const actual = await vi.importActual('@/app/composables/useWorkflowState');
@@ -51,7 +50,6 @@ describe('useWorkflowHelpers', () => {
 	let workflowsStore: ReturnType<typeof mockedStore<typeof useWorkflowsStore>>;
 	let workflowsListStore: ReturnType<typeof mockedStore<typeof useWorkflowsListStore>>;
 	let workflowState: WorkflowState;
-	let workflowsEEStore: ReturnType<typeof useWorkflowsEEStore>;
 	let tagsStore: ReturnType<typeof useTagsStore>;
 	let uiStore: ReturnType<typeof mockedStore<typeof useUIStore>>;
 
@@ -63,13 +61,13 @@ describe('useWorkflowHelpers', () => {
 		workflowState = useWorkflowState();
 		vi.mocked(injectWorkflowState).mockReturnValue(workflowState);
 
-		workflowsEEStore = useWorkflowsEEStore();
 		tagsStore = useTagsStore();
 		uiStore = mockedStore(useUIStore);
 	});
 
 	afterEach(() => {
 		vi.clearAllMocks();
+		workflowsStore.workflowId = '';
 	});
 
 	describe('getNodeParametersWithResolvedExpressions', () => {
@@ -245,43 +243,23 @@ describe('useWorkflowHelpers', () => {
 				tags: [],
 			});
 			const addWorkflowSpy = vi.spyOn(workflowsListStore, 'addWorkflow');
-			const setActiveSpy = vi.spyOn(workflowState, 'setActive');
 			const setWorkflowIdSpy = vi.spyOn(workflowState, 'setWorkflowId');
-			const setWorkflowNameSpy = vi.spyOn(workflowState, 'setWorkflowName');
-			const setWorkflowSettingsSpy = vi.spyOn(workflowState, 'setWorkflowSettings');
-			const setWorkflowPinDataSpy = vi.spyOn(workflowState, 'setWorkflowPinData');
-			const setWorkflowVersionDataSpy = vi.spyOn(workflowsStore, 'setWorkflowVersionData');
-			const setWorkflowMetadataSpy = vi.spyOn(workflowState, 'setWorkflowMetadata');
-			const setWorkflowScopesSpy = vi.spyOn(workflowState, 'setWorkflowScopes');
-			const setUsedCredentialsSpy = vi.spyOn(workflowsStore, 'setUsedCredentials');
-			const setWorkflowSharedWithSpy = vi.spyOn(workflowsEEStore, 'setWorkflowSharedWith');
 			const upsertTagsSpy = vi.spyOn(tagsStore, 'upsertTags');
 
-			await initState(workflowData);
+			const { workflowDocumentStore } = await initState(workflowData);
 
 			expect(addWorkflowSpy).toHaveBeenCalledWith(workflowData);
-			expect(setActiveSpy).toHaveBeenCalledWith('v1');
 			expect(setWorkflowIdSpy).toHaveBeenCalledWith('1');
-			expect(setWorkflowNameSpy).toHaveBeenCalledWith({
-				newName: 'Test Workflow',
-				setStateDirty: false,
+			// name is now managed by workflowDocumentStore via setName
+			expect(workflowDocumentStore.setName).toHaveBeenCalledWith('Test Workflow');
+			// versionId is now managed by workflowDocumentStore
+			expect(workflowDocumentStore.setVersionData).toHaveBeenCalledWith({
+				versionId: 'v1',
+				name: null,
+				description: null,
 			});
-			expect(setWorkflowSettingsSpy).toHaveBeenCalledWith({
-				executionOrder: 'v1',
-				timezone: 'DEFAULT',
-			});
-			expect(setWorkflowPinDataSpy).toHaveBeenCalledWith({});
-			expect(setWorkflowVersionDataSpy).toHaveBeenCalledWith(
-				{ versionId: 'v1', name: null, description: null },
-				'checksum',
-			);
-			expect(setWorkflowMetadataSpy).toHaveBeenCalledWith({});
-			expect(setWorkflowScopesSpy).toHaveBeenCalledWith(['workflow:create']);
-			expect(setUsedCredentialsSpy).toHaveBeenCalledWith([]);
-			expect(setWorkflowSharedWithSpy).toHaveBeenCalledWith({
-				workflowId: '1',
-				sharedWithProjects: [],
-			});
+			// sharedWithProjects is now managed by workflowDocumentStore
+			expect(workflowDocumentStore.setSharedWithProjects).toHaveBeenCalledWith([]);
 			// Tags are now managed by workflowDocumentStore
 			expect(upsertTagsSpy).toHaveBeenCalledWith([]);
 		});
@@ -298,13 +276,11 @@ describe('useWorkflowHelpers', () => {
 				scopes: [],
 				tags: [],
 			});
-			const setUsedCredentialsSpy = vi.spyOn(workflowsStore, 'setUsedCredentials');
-			const setWorkflowSharedWithSpy = vi.spyOn(workflowsEEStore, 'setWorkflowSharedWith');
 
-			await initState(workflowData);
+			const { workflowDocumentStore } = await initState(workflowData);
 
-			expect(setUsedCredentialsSpy).not.toHaveBeenCalled();
-			expect(setWorkflowSharedWithSpy).not.toHaveBeenCalled();
+			// When sharedWithProjects is undefined, it defaults to empty array
+			expect(workflowDocumentStore.setSharedWithProjects).toHaveBeenCalledWith([]);
 		});
 
 		it('should handle missing `tags` gracefully', async () => {
@@ -328,26 +304,67 @@ describe('useWorkflowHelpers', () => {
 	});
 
 	describe('getWorkflowDataToSave', () => {
+		it('should snapshot connections so later store mutations do not affect saved data', async () => {
+			const workflowId = 'test-workflow-id';
+			const initialConnections: IConnections = {
+				'Node A': {
+					main: [[{ node: 'Node B', index: 0, type: NodeConnectionTypes.Main }]],
+				},
+			};
+
+			workflowsStore.workflowId = workflowId;
+			workflowsStore.allNodes = [];
+			workflowsStore.workflow.versionId = 'v1';
+
+			const documentId = createWorkflowDocumentId(workflowId);
+			const workflowDocumentStore = useWorkflowDocumentStore(documentId);
+			Object.defineProperty(workflowDocumentStore, 'name', { value: 'Test Workflow' });
+			Object.defineProperty(workflowDocumentStore, 'connectionsBySourceNode', {
+				value: initialConnections,
+				configurable: true,
+			});
+			vi.mocked(workflowDocumentStore.getSettingsSnapshot).mockReturnValue({
+				executionOrder: 'v1',
+			});
+
+			const { getWorkflowDataToSave } = useWorkflowHelpers();
+			const workflowData = await getWorkflowDataToSave();
+
+			// Simulate a node + connection being added to the store after snapshot
+			// It should not mutate the connections in the saved workflow data (reference sharing)
+			initialConnections['New Node'] = {
+				main: [[{ node: 'Node B', index: 0, type: NodeConnectionTypes.Main }]],
+			};
+
+			// The saved data must not include the late-added connection
+			expect(workflowData.connections).not.toHaveProperty('New Node');
+		});
+
 		it('should read tags from workflowDocumentStore', async () => {
 			const workflowId = 'test-workflow-id';
 			const tagIds = ['tag1', 'tag2'];
 
 			workflowsStore.workflowId = workflowId;
-			workflowsStore.workflowName = 'Test Workflow';
 			workflowsStore.allNodes = [];
-			workflowsStore.allConnections = {};
 			workflowsStore.isWorkflowActive = false;
 			workflowsStore.workflow.settings = { executionOrder: 'v1' };
 			workflowsStore.workflow.versionId = 'v1';
-			workflowsStore.workflow.meta = {};
 			workflowsStore.pinnedWorkflowData = {};
 
 			const documentId = createWorkflowDocumentId(workflowId);
 			const workflowDocumentStore = useWorkflowDocumentStore(documentId);
+			Object.defineProperty(workflowDocumentStore, 'connectionsBySourceNode', {
+				value: {},
+				configurable: true,
+			});
 
-			// Note: createTestingPinia() stubs actions by default, so setTags() won't work
+			// Note: createTestingPinia() stubs actions by default, so setTags()/setSettings()/setName() won't work
+			Object.defineProperty(workflowDocumentStore, 'name', { value: 'Test Workflow' });
 			Object.defineProperty(workflowDocumentStore, 'tags', {
 				value: tagIds,
+			});
+			vi.mocked(workflowDocumentStore.getSettingsSnapshot).mockReturnValue({
+				executionOrder: 'v1',
 			});
 
 			const { getWorkflowDataToSave } = useWorkflowHelpers();
@@ -1027,9 +1044,13 @@ describe('useWorkflowHelpers', () => {
 			const inputName = 'main';
 			const runIndex = 0;
 
-			workflowsStore.pinnedWorkflowData = {
+			workflowsStore.workflowId = 'test-workflow';
+			const workflowDocumentStore = useWorkflowDocumentStore(
+				createWorkflowDocumentId('test-workflow'),
+			);
+			vi.mocked(workflowDocumentStore.getPinDataSnapshot).mockReturnValue({
 				ParentNode: [{ json: { key: 'value' } }],
-			};
+			});
 
 			const result = executeData({}, parentNodes, currentNode, inputName, runIndex);
 
@@ -1045,7 +1066,6 @@ describe('useWorkflowHelpers', () => {
 			const inputName = 'main';
 			const runIndex = 0;
 
-			workflowsStore.pinnedWorkflowData = undefined;
 			workflowsStore.getWorkflowRunData = {
 				ParentNode: [
 					{
@@ -1085,7 +1105,6 @@ describe('useWorkflowHelpers', () => {
 			const runIndex = 0;
 			const parentRunIndex = 1;
 
-			workflowsStore.pinnedWorkflowData = undefined;
 			workflowsStore.getWorkflowRunData = {
 				ParentNode: [
 					{ data: {} } as never,
@@ -1127,7 +1146,6 @@ describe('useWorkflowHelpers', () => {
 			const inputName = 'main';
 			const runIndex = 0;
 
-			workflowsStore.pinnedWorkflowData = undefined;
 			workflowsStore.getWorkflowRunData = null;
 
 			const result = executeData({}, parentNodes, currentNode, inputName, runIndex);
