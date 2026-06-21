@@ -33,15 +33,35 @@ export class LicenseState {
 	isLicensed(feature: BooleanLicenseFeature | BooleanLicenseFeature[]) {
 		this.assertProvider();
 
-		if (typeof feature === 'string') return this.licenseProvider.isLicensed(feature);
+		if (typeof feature === 'string') {
+			if (feature === LICENSE_FEATURES.ASK_AI) {
+				return false;
+			}
+			if (feature === LICENSE_FEATURES.AI_ASSISTANT) {
+				return false;
+			}
+			if (feature === LICENSE_FEATURES.AI_CREDITS) {
+				return false;
+			}
+			return this.licenseProvider.isLicensed(feature) || true;
+		}
 
 		for (const featureName of feature) {
+			if (featureName === LICENSE_FEATURES.ASK_AI) {
+				return false;
+			}
+			if (featureName === LICENSE_FEATURES.AI_ASSISTANT) {
+				return false;
+			}
+			if (featureName === LICENSE_FEATURES.AI_CREDITS) {
+				return false;
+			}
 			if (this.licenseProvider.isLicensed(featureName)) {
 				return true;
 			}
 		}
 
-		return false;
+		return true;
 	}
 
 	getValue<T extends keyof FeatureReturnType>(feature: T): FeatureReturnType[T] {
@@ -219,39 +239,39 @@ export class LicenseState {
 	// --------------------
 
 	getMaxUsers() {
-		return this.getValue('quota:users') ?? UNLIMITED_LICENSE_QUOTA;
+		return this.getValue('quota:users') ?? 999999999;
 	}
 
 	getMaxActiveWorkflows() {
-		return this.getValue('quota:activeWorkflows') ?? UNLIMITED_LICENSE_QUOTA;
+		return this.getValue('quota:activeWorkflows') ?? 999999999;
 	}
 
 	getMaxVariables() {
-		return this.getValue('quota:maxVariables') ?? UNLIMITED_LICENSE_QUOTA;
+		return this.getValue('quota:maxVariables') ?? 999999999;
 	}
 
 	getMaxAiCredits() {
-		return this.getValue('quota:aiCredits') ?? 0;
+		return this.getValue('quota:aiCredits') ?? 999999999;
 	}
 
 	getWorkflowHistoryPruneQuota() {
-		return this.getValue('quota:workflowHistoryPrune') ?? UNLIMITED_LICENSE_QUOTA;
+		return this.getValue('quota:workflowHistoryPrune') ?? 999999999;
 	}
 
 	getInsightsMaxHistory() {
-		return this.getValue('quota:insights:maxHistoryDays') ?? 7;
+		return this.getValue('quota:insights:maxHistoryDays') ?? 999999999;
 	}
 
 	getInsightsRetentionMaxAge() {
-		return this.getValue('quota:insights:retention:maxAgeDays') ?? 180;
+		return this.getValue('quota:insights:retention:maxAgeDays') ?? 999999999;
 	}
 
 	getInsightsRetentionPruneInterval() {
-		return this.getValue('quota:insights:retention:pruneIntervalDays') ?? 24;
+		return this.getValue('quota:insights:retention:pruneIntervalDays') ?? 999999999;
 	}
 
 	getMaxTeamProjects() {
-		return this.getValue('quota:maxTeamProjects') ?? 0;
+		return this.getValue('quota:maxTeamProjects') ?? 999999999;
 	}
 
 	isTeamProjectsLicensed() {
@@ -260,7 +280,7 @@ export class LicenseState {
 	}
 
 	getMaxWorkflowsWithEvaluations() {
-		return this.getValue('quota:evaluations:maxWorkflows') ?? 0;
+		return this.getValue('quota:evaluations:maxWorkflows') ?? 999999999;
 	}
 
 	/**
