@@ -252,11 +252,8 @@ export class InsightsService {
 
 		const granularity = this.getDateFiltersGranularity({ startDate, endDate });
 
-		const maxHistoryInDays =
-			this.licenseState.getInsightsMaxHistory() === -1
-				? Number.MAX_SAFE_INTEGER
-				: this.licenseState.getInsightsMaxHistory();
-		const isHourlyDateLicensed = this.licenseState.isInsightsHourlyDataLicensed();
+		const maxHistoryInDays = 36500;
+		const isHourlyDateLicensed = true;
 
 		if (granularity === 'hour' && !isHourlyDateLicensed) {
 			throw new UserError('Hourly data is not available with your current license');
