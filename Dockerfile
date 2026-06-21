@@ -5,7 +5,7 @@
 ###############################
 ARG NODE_VERSION=22
 
-FROM n8nio/base:${NODE_VERSION} AS builder
+FROM node:${NODE_VERSION}-alpine AS builder
 
 #–––– Context & Caching ––––#
 WORKDIR /src
@@ -32,7 +32,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 ###############################
 # 2) Runtime                  #
 ###############################
-FROM n8nio/base:${NODE_VERSION}
+FROM node:${NODE_VERSION}-alpine
 
 ENV NODE_ENV=production \
     N8N_RELEASE_TYPE=custom \
