@@ -75,6 +75,7 @@ RUN cd /home/node && \
         'n8n-nodes-puppeteer-extended', \
         '@neverlosecc/n8n-nodes-phonenumber-parser' \
       ]; \
+      pkg.dependencies = pkg.dependencies || {}; \
       extras.forEach(function(p){ pkg.dependencies[p] = 'latest'; }); \
       fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n'); \
     "
