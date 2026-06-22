@@ -84,7 +84,10 @@ RUN corepack enable pnpm \
 
 # Use docker-entrypoint from upstream if available
 COPY docker/images/n8n/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh && \
+    ln -s /home/node/packages/cli/bin/n8n /usr/local/bin/n8n && \
+    mkdir -p /home/node/.n8n && \
+    chown -R node:node /home/node
 
 EXPOSE 5678
 
