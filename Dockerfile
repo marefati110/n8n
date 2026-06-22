@@ -71,8 +71,7 @@ RUN cd /home/node && \
         'n8n-nodes-globals', \
         'n8n-nodes-document-generator', \
         'n8n-nodes-mattermost-app', \
-        'n8n-nodes-puppeteer-extended', \
-        '@neverlosecc/n8n-nodes-phonenumber-parser' \
+        'n8n-nodes-puppeteer-extended' \
       ]; \
       pkg.dependencies = pkg.dependencies || {}; \
       extras.forEach(function(p){ pkg.dependencies[p] = 'latest'; }); \
