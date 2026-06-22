@@ -70,7 +70,6 @@ RUN cd /home/node && \
         'n8n-nodes-text-manipulation', \
         'n8n-nodes-globals', \
         'n8n-nodes-document-generator', \
-        'n8n-nodes-mattermost-app', \
         'n8n-nodes-puppeteer-extended' \
       ]; \
       pkg.dependencies = pkg.dependencies || {}; \
