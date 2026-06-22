@@ -17,7 +17,7 @@ RUN corepack enable pnpm \
 COPY . /src
 
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    DOCKER_BUILD=true pnpm install --frozen-lockfile --network-timeout 100000
+    DOCKER_BUILD=true pnpm install --frozen-lockfile
 
 RUN pnpm build
 
@@ -82,7 +82,7 @@ RUN cd /home/node && \
 # Install the external modules
 RUN corepack enable pnpm \
     && corepack prepare pnpm@10.22.0 --activate \
-    && DOCKER_BUILD=true pnpm install --no-frozen-lockfile --network-timeout 100000
+    && DOCKER_BUILD=true pnpm install --no-frozen-lockfile
 
 # Use docker-entrypoint from upstream if available
 COPY docker/images/n8n/docker-entrypoint.sh /docker-entrypoint.sh
