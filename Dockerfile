@@ -68,7 +68,6 @@ RUN cd /home/node && \
       const pkg = JSON.parse(fs.readFileSync('package.json','utf8')); \
       const extras = [ \
         'n8n-nodes-text-manipulation', \
-        '@nicholasgasior/n8n-nodes-gpt', \
         'n8n-nodes-globals', \
         'n8n-nodes-document-generator', \
         'n8n-nodes-mattermost-app', \
