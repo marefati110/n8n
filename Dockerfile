@@ -23,7 +23,7 @@ RUN pnpm build
 
 # Slim down: keep only production node_modules
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm prune --prod --no-optional \
+    CI=true pnpm prune --prod --no-optional \
     && find . -name '*.ts' ! -name '*.d.ts' -delete \
     && find . -name '*.map'                 -delete \
     && find . -name '*.tsbuildinfo'         -delete \
@@ -82,7 +82,7 @@ RUN cd /home/node && \
 # Install the external modules
 RUN corepack enable pnpm \
     && corepack prepare pnpm@10.22.0 --activate \
-    && DOCKER_BUILD=true pnpm install --no-frozen-lockfile
+    && CI=true DOCKER_BUILD=true pnpm install --no-frozen-lockfile
 
 # Use docker-entrypoint from upstream if available
 COPY docker/images/n8n/docker-entrypoint.sh /docker-entrypoint.sh
