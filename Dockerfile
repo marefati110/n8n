@@ -70,7 +70,9 @@ RUN cd /home/node && \
         'n8n-nodes-text-manipulation', \
         'n8n-nodes-globals', \
         'n8n-nodes-document-generator', \
-        'n8n-nodes-puppeteer-extended' \
+        'n8n-nodes-mattermost-app', \
+        'n8n-nodes-puppeteer-extended', \
+        '@neverlosecc/n8n-nodes-phonenumber-parser' \
       ]; \
       pkg.dependencies = pkg.dependencies || {}; \
       extras.forEach(function(p){ pkg.dependencies[p] = 'latest'; }); \
