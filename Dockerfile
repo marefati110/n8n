@@ -27,7 +27,9 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     && find . -name '*.ts' ! -name '*.d.ts' -delete \
     && find . -name '*.map'                 -delete \
     && find . -name '*.tsbuildinfo'         -delete \
-    && rm -rf .turbo
+    && rm -rf .turbo \
+    && rm -rf packages/editor-ui/node_modules \
+    && rm -rf .git
 
 ###############################
 # 2) Runtime                  #
@@ -35,7 +37,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 FROM node:${NODE_VERSION}-alpine
 
 ENV NODE_ENV=production \
-    N8N_RELEASE_TYPE=custom \
+    N8N_RELEASE_TYPE=stable \
     N8N_DIAGNOSTICS_ENABLED=false \
     GENERIC_TIMEZONE=Asia/Tehran \
     TZ=Asia/Tehran
@@ -54,38 +56,27 @@ RUN apk add --no-cache \
     graphicsmagick
 
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    NODE_FUNCTION_ALLOW_EXTERNAL=* \
+    NODE_PATH=/home/node/.n8n/custom/node_modules
 
 WORKDIR /home/node
 
 # Copy built files
 COPY --from=builder /src /home/node
 
-# Install external community nodes
-RUN cd /home/node && \
-    NODE_PATH=/home/node/node_modules node -e " \
-      const fs = require('fs'); \
-      const pkg = JSON.parse(fs.readFileSync('package.json','utf8')); \
-      const extras = [ \
-        'n8n-nodes-text-manipulation', \
-        'n8n-nodes-globals', \
-        'n8n-nodes-document-generator', \
-        'n8n-nodes-puppeteer-extended' \
-      ]; \
-      pkg.dependencies = pkg.dependencies || {}; \
-      extras.forEach(function(p){ pkg.dependencies[p] = 'latest'; }); \
-      fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n'); \
-    "
-
-# Install the external modules
-RUN corepack enable pnpm \
-    && corepack prepare pnpm@10.22.0 --activate \
-    && CI=true DOCKER_BUILD=true pnpm install --no-frozen-lockfile
+# Install external community nodes and modules
+RUN mkdir -p /home/node/.n8n/custom && \
+    cd /home/node/.n8n/custom && \
+    npm init -y && \
+    npm install n8n-nodes-text-manipulation n8n-nodes-globals n8n-nodes-document-generator n8n-nodes-puppeteer-extended moment-jalaali
 
 # Use docker-entrypoint from upstream if available
 COPY docker/images/n8n/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh && \
-    ln -s /home/node/packages/cli/bin/n8n /usr/local/bin/n8n && \
+    echo '#!/bin/sh' > /usr/local/bin/n8n && \
+    echo 'exec /home/node/packages/cli/bin/n8n "$@"' >> /usr/local/bin/n8n && \
+    chmod +x /usr/local/bin/n8n && \
     mkdir -p /home/node/.n8n && \
     chown -R node:node /home/node
 
