@@ -3,7 +3,7 @@
 ###############################
 # 1) Builder – compile n8n   #
 ###############################
-ARG NODE_VERSION=22
+ARG NODE_VERSION=24
 
 FROM n8nio/base:${NODE_VERSION} AS builder
 
