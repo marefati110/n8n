@@ -3,9 +3,12 @@
 ###############################
 # 1) Builder – compile n8n   #
 ###############################
-ARG NODE_VERSION=24
+ARG NODE_VERSION=24.16.0
 
-FROM n8nio/base:${NODE_VERSION} AS builder
+FROM node:${NODE_VERSION}-alpine AS builder
+
+# Install build toolchain for native modules
+RUN apk add --no-cache python3 make g++
 
 #–––– Context & Caching ––––#
 WORKDIR /src
