@@ -3,12 +3,16 @@
 ###############################
 # 1) Builder – compile n8n   #
 ###############################
-ARG NODE_VERSION=24.16.0
+ARG NODE_VERSION=22
 
-FROM node:${NODE_VERSION}-alpine AS builder
+FROM n8nio/base:${NODE_VERSION} AS builder
 
-# Install build toolchain for native modules
-RUN apk add --no-cache python3 make g++
+# Install build toolchain for native modules (Debian/Ubuntu)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 #–––– Context & Caching ––––#
 WORKDIR /src
@@ -43,20 +47,21 @@ ENV NODE_ENV=production \
     GENERIC_TIMEZONE=Asia/Tehran \
     TZ=Asia/Tehran
 
-# Install chromium for puppeteer (optional, for headless browser nodes)
-RUN apk add --no-cache \
+# Install chromium for puppeteer and other runtime deps (Debian/Ubuntu)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
-    nss \
-    freetype \
-    harfbuzz \
+    libnss3 \
+    libfreetype6 \
+    libharfbuzz0b \
     ca-certificates \
-    ttf-freefont \
+    fonts-freefont-ttf \
     tini \
-    su-exec \
+    gosu \
     git \
-    graphicsmagick
+    graphicsmagick \
+    && rm -rf /var/lib/apt/lists/*
 
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 WORKDIR /home/node
