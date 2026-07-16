@@ -5,7 +5,7 @@
 ###############################
 ARG NODE_VERSION=22
 
-FROM n8nio/base:${NODE_VERSION} AS builder
+FROM node:${NODE_VERSION}-bookworm-slim AS builder
 
 # Install build toolchain for native modules (Debian/Ubuntu)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -17,9 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #–––– Context & Caching ––––#
 WORKDIR /src
 
-# Install pnpm via Corepack
+# Install pnpm via Corepack (version must match packageManager in package.json)
 RUN corepack enable pnpm \
-    && corepack prepare pnpm@10.22.0 --activate
+    && corepack prepare pnpm@10.32.1 --activate
 
 COPY . /src
 
@@ -39,7 +39,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 ###############################
 # 2) Runtime                  #
 ###############################
-FROM n8nio/base:${NODE_VERSION}
+FROM node:${NODE_VERSION}-bookworm-slim
 
 ENV NODE_ENV=production \
     N8N_RELEASE_TYPE=custom \
@@ -89,7 +89,7 @@ RUN cd /home/node && \
 
 # Install the external modules
 RUN corepack enable pnpm \
-    && corepack prepare pnpm@10.22.0 --activate \
+    && corepack prepare pnpm@10.32.1 --activate \
     && pnpm install --no-frozen-lockfile
 
 # Use docker-entrypoint from upstream if available
