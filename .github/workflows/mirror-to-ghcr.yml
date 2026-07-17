@@ -1,0 +1,39 @@
+name: Mirror n8n-ent to GHCR
+
+on:
+  workflow_dispatch:
+
+env:
+  SRC_IMAGE: marefati110/n8n-ent:latest
+  DST_IMAGE: ghcr.io/marefati110/n8n-ent
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: marefati110
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull from Docker Hub and push to GHCR
+        run: |
+          set -euo pipefail
+          IMAGE_TAG=$(date -u +'%Y%m%d')
+          docker pull "$SRC_IMAGE"
+          docker tag "$SRC_IMAGE" "${DST_IMAGE}:latest"
+          docker tag "$SRC_IMAGE" "${DST_IMAGE}:${IMAGE_TAG}"
+          docker push "${DST_IMAGE}:latest"
+          docker push "${DST_IMAGE}:${IMAGE_TAG}"
+          echo "Mirrored $SRC_IMAGE -> ${DST_IMAGE}:latest and :${IMAGE_TAG}"
