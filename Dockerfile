@@ -3,19 +3,20 @@
 ###############################
 # 1) Builder – compile n8n   #
 ###############################
-ARG NODE_VERSION=22
+ARG NODE_VERSION=24.16.0
 
 FROM node:${NODE_VERSION}-bookworm-slim AS builder
 
-# Install build toolchain for native modules (Debian/Ubuntu)
+WORKDIR /src
+
+# Build toolchain + git (needed by pnpm/prepare) + CA certs for registry HTTPS
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
     g++ \
+    git \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
-#–––– Context & Caching ––––#
-WORKDIR /src
 
 # Install pnpm via Corepack (version must match packageManager in package.json)
 RUN corepack enable pnpm \
@@ -23,18 +24,22 @@ RUN corepack enable pnpm \
 
 COPY . /src
 
+# DOCKER_BUILD=true skips lefthook install in scripts/prepare.mjs
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+    DOCKER_BUILD=true pnpm install --frozen-lockfile
 
-RUN pnpm build
-
-# Slim down: keep only production node_modules
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm prune --prod --no-optional \
-    && find . -name '*.ts' ! -name '*.d.ts' -delete \
-    && find . -name '*.map'                 -delete \
-    && find . -name '*.tsbuildinfo'         -delete \
-    && rm -rf .turbo
+    DOCKER_BUILD=true pnpm build
+
+# Deploy pruned production bundle into ./compiled
+RUN DOCKER_BUILD=true CI=true node scripts/docker-deploy-n8n.mjs
+
+# Rebuild native modules for the runtime libc
+RUN cd /src/compiled && \
+    npm rebuild sqlite3 && \
+    rm -rf node_modules/isolated-vm/prebuilds && \
+    cd node_modules/isolated-vm && \
+    node /usr/local/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js rebuild --release -j max
 
 ###############################
 # 2) Runtime                  #
@@ -42,12 +47,12 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 FROM node:${NODE_VERSION}-bookworm-slim
 
 ENV NODE_ENV=production \
-    N8N_RELEASE_TYPE=custom \
+    N8N_RELEASE_TYPE=stable \
     N8N_DIAGNOSTICS_ENABLED=false \
     GENERIC_TIMEZONE=Asia/Tehran \
     TZ=Asia/Tehran
 
-# Install chromium for puppeteer and other runtime deps (Debian/Ubuntu)
+# Chromium + runtime deps (Debian/bookworm)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     libnss3 \
@@ -62,40 +67,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    NODE_FUNCTION_ALLOW_EXTERNAL=* \
+    NODE_PATH=/home/node/.n8n/custom/node_modules
 
 WORKDIR /home/node
 
-# Copy built files
-COPY --from=builder /src /home/node
+# Deployed production bundle (all workspace deps resolved correctly)
+COPY --from=builder /src/compiled /usr/local/lib/node_modules/n8n
 
-# Install external community nodes
-RUN cd /home/node && \
-    NODE_PATH=/home/node/node_modules node -e " \
-      const fs = require('fs'); \
-      const pkg = JSON.parse(fs.readFileSync('package.json','utf8')); \
-      const extras = [ \
-        'n8n-nodes-text-manipulation', \
-        '@nicholasgasior/n8n-nodes-gpt', \
-        'n8n-nodes-globals', \
-        'n8n-nodes-document-generator', \
-        'n8n-nodes-mattermost-app', \
-        'n8n-nodes-puppeteer-extended', \
-        '@neverlosecc/n8n-nodes-phonenumber-parser' \
-      ]; \
-      extras.forEach(function(p){ pkg.dependencies[p] = 'latest'; }); \
-      fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n'); \
-    "
+# Install external community nodes and modules
+RUN mkdir -p /home/node/.n8n/custom && \
+    cd /home/node/.n8n/custom && \
+    npm init -y && \
+    npm install n8n-nodes-text-manipulation n8n-nodes-globals n8n-nodes-document-generator n8n-nodes-puppeteer-extended moment-jalaali
 
-# Install the external modules
-RUN corepack enable pnpm \
-    && corepack prepare pnpm@10.32.1 --activate \
-    && pnpm install --no-frozen-lockfile
-
-# Use docker-entrypoint from upstream if available
 COPY docker/images/n8n/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh && \
+    ln -sf /usr/local/lib/node_modules/n8n/bin/n8n /usr/local/bin/n8n && \
+    mkdir -p /home/node/.n8n && \
+    chown -R node:node /home/node && \
+    rm -rf /root/.npm /tmp/*
 
 EXPOSE 5678
 
+USER node
 ENTRYPOINT ["tini", "--", "/docker-entrypoint.sh"]
