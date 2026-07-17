@@ -6,10 +6,11 @@ on:
     tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ "master" ]
+  workflow_dispatch:
 
 env:
   DOCKER_HUB_IMAGE: marefati110/n8n-ent
-  DOCKER_HUB_REGISTRY: hub.docker.com
+  GHCR_IMAGE: ghcr.io/marefati110/n8n-ent
 
 jobs:
   build:
@@ -38,13 +39,23 @@ jobs:
           username: marefati110
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
         with:
-          images: ${{ env.DOCKER_HUB_IMAGE }}
+          images: |
+            ${{ env.DOCKER_HUB_IMAGE }}
+            ${{ env.GHCR_IMAGE }}
 
-      - name: Build and push Docker image to Docker Hub
+      - name: Build and push Docker image
         id: dockerhub-push
         if: github.event_name != 'pull_request'
         run: |
@@ -54,10 +65,14 @@ jobs:
           docker tag ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG ${{ env.DOCKER_HUB_IMAGE }}:latest
           docker push ${{ env.DOCKER_HUB_IMAGE }}:latest
 
-          # ذخیره مقدار IMAGE_TAG به عنوان خروجی مرحله
+          # Mirror to GHCR for networks that block Docker Hub
+          docker tag ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG ${{ env.GHCR_IMAGE }}:$IMAGE_TAG
+          docker tag ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG ${{ env.GHCR_IMAGE }}:latest
+          docker push ${{ env.GHCR_IMAGE }}:$IMAGE_TAG
+          docker push ${{ env.GHCR_IMAGE }}:latest
+
           echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-          # استخراج digest از image push
           DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG | cut -d'@' -f2)
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
