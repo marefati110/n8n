@@ -396,12 +396,7 @@ export class ProjectService {
 		overrides: ProjectCreateOverrides = {},
 	) {
 		const limit = this.licenseState.getMaxTeamProjects();
-		if (limit !== UNLIMITED_LICENSE_QUOTA) {
-			const teamProjectCount = await trx.count(Project, { where: { type: 'team' } });
-			if (teamProjectCount >= limit) {
-				throw new TeamProjectOverQuotaError(limit);
-			}
-		}
+		const teamProjectCount = await trx.count(Project, { where: { type: 'team' } });
 
 		const project = await trx.save(
 			Project,
