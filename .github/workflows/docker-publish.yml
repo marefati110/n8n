@@ -6,8 +6,10 @@ on:
     tags: [ 'v*.*.*' ]
   pull_request:
     branches: [ "master" ]
+  workflow_dispatch:
 
 env:
+  GHCR_IMAGE: ghcr.io/marefati110/n8n-ent
   DOCKER_HUB_IMAGE: marefati110/n8n-ent
 
 jobs:
@@ -39,6 +41,8 @@ jobs:
           IMAGE_TAG=$(date +'%Y%m%d')
           docker buildx build \
             --file Dockerfile \
+            --tag ${{ env.GHCR_IMAGE }}:$IMAGE_TAG \
+            --tag ${{ env.GHCR_IMAGE }}:latest \
             --tag ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG \
             --tag ${{ env.DOCKER_HUB_IMAGE }}:latest \
             --progress=plain \
@@ -46,15 +50,31 @@ jobs:
             .
           echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push ${{ env.GHCR_IMAGE }}:${{ steps.build.outputs.tag }}
+          docker push ${{ env.GHCR_IMAGE }}:latest
+          echo "Image published: ${{ env.GHCR_IMAGE }}:latest"
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && secrets.DOCKERHUB_TOKEN != ''
         uses: docker/login-action@v3
         with:
           username: marefati110
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push Docker image to Docker Hub
-        if: github.event_name != 'pull_request'
+      - name: Push to Docker Hub
+        if: github.event_name != 'pull_request' && secrets.DOCKERHUB_TOKEN != ''
         run: |
           docker push ${{ env.DOCKER_HUB_IMAGE }}:${{ steps.build.outputs.tag }}
           docker push ${{ env.DOCKER_HUB_IMAGE }}:latest
+          echo "Image published: ${{ env.DOCKER_HUB_IMAGE }}:latest"
