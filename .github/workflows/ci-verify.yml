@@ -1,0 +1,24 @@
+name: Verify Build
+
+on:
+  push:
+    branches: [ "master", "update/2.27.3", "update/2.36.7" ]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
+        cache: pnpm
+    - name: Install pnpm
+      run: corepack enable pnpm
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    - name: Build
+      run: pnpm build
+    - name: Done
+      run: echo "Build verification complete!"
