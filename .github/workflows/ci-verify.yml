@@ -2,20 +2,28 @@ name: Verify Build
 
 on:
   push:
-    branches: [ "update/2.36.7" ]
+    branches: [ "master", "update/2.27.3", "update/2.36.7" ]
+  pull_request:
+    branches: [ "master" ]
   workflow_dispatch:
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
     - uses: pnpm/action-setup@v4
       with:
         version: 10.32.1
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
+        cache: pnpm
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
-    - name: Build
+    - name: Build packages
       run: pnpm build
     - name: Done
       run: echo "SUCCESS: Build verification complete!"
