@@ -1,26 +1,10 @@
 # Custom .dockerignore for full source build
-# Exclude heavy/unnecessary files to keep build context manageable
-
 .git
 node_modules
 **/node_modules
-**/dist
-**/build
 **/.turbo
 build.log
-
-# Test and dev files
-**/*.test.ts
-**/*.spec.ts
-**/__tests__
-**/__mocks__
-**/test
-**/tests
-**/.storybook
-**/playwright
-**/*.stories.*
-
-# IDE and misc
+install.log
 .vscode
 .idea
 .devcontainer

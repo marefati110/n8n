@@ -3,7 +3,7 @@
 ###############################
 # 1) Builder – compile n8n   #
 ###############################
-ARG NODE_VERSION=24.16.0
+ARG NODE_VERSION=24.18.1
 
 FROM node:${NODE_VERSION}-bookworm-slim AS builder
 
@@ -24,15 +24,20 @@ RUN corepack enable pnpm \
 
 COPY . /src
 
+ENV DOCKER_BUILD=true \
+    CI=true \
+    NODE_OPTIONS=--max-old-space-size=6144 \
+    TURBO_CONCURRENCY=2
+
 # DOCKER_BUILD=true skips lefthook install in scripts/prepare.mjs
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    DOCKER_BUILD=true pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile
 
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    DOCKER_BUILD=true pnpm build
+    pnpm build
 
 # Deploy pruned production bundle into ./compiled
-RUN DOCKER_BUILD=true CI=true node scripts/docker-deploy-n8n.mjs
+RUN node scripts/docker-deploy-n8n.mjs
 
 # Rebuild native modules for the runtime libc
 RUN cd /src/compiled && \
