@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install pnpm via Corepack (version must match packageManager in package.json)
 RUN corepack enable pnpm \
-    && corepack prepare pnpm@10.32.1 --activate
+    && corepack prepare pnpm@12.4.2 --activate
 
 COPY . /src
 
