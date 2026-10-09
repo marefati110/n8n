@@ -19,6 +19,8 @@ jobs:
       contents: read
       packages: write
       id-token: write
+    env:
+      HAS_DOCKERHUB: ${{ secrets.DOCKERHUB_TOKEN != '' }}
 
     steps:
       - name: Checkout repository
@@ -34,6 +36,7 @@ jobs:
         uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
 
       - name: Log in to Docker Hub
+        if: env.HAS_DOCKERHUB == 'true'
         uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
         with:
           username: marefati110
@@ -60,24 +63,30 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           IMAGE_TAG=$(date +'%Y%m%d')
-          docker build -t ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG .
-          docker push ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG
-          docker tag ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG ${{ env.DOCKER_HUB_IMAGE }}:latest
-          docker push ${{ env.DOCKER_HUB_IMAGE }}:latest
+          docker build -t ${{ env.GHCR_IMAGE }}:$IMAGE_TAG .
 
-          # Mirror to GHCR for networks that block Docker Hub
-          docker tag ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG ${{ env.GHCR_IMAGE }}:$IMAGE_TAG
-          docker tag ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG ${{ env.GHCR_IMAGE }}:latest
+          # Publish to GHCR first; it needs no extra secrets
           docker push ${{ env.GHCR_IMAGE }}:$IMAGE_TAG
+          docker tag ${{ env.GHCR_IMAGE }}:$IMAGE_TAG ${{ env.GHCR_IMAGE }}:latest
           docker push ${{ env.GHCR_IMAGE }}:latest
 
           echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG | cut -d'@' -f2)
+          if [ "$HAS_DOCKERHUB" = "true" ]; then
+            # Mirror to Docker Hub when the token secret is valid
+            docker tag ${{ env.GHCR_IMAGE }}:$IMAGE_TAG ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG
+            docker tag ${{ env.GHCR_IMAGE }}:$IMAGE_TAG ${{ env.DOCKER_HUB_IMAGE }}:latest
+            docker push ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG
+            docker push ${{ env.DOCKER_HUB_IMAGE }}:latest
+
+            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.DOCKER_HUB_IMAGE }}:$IMAGE_TAG | cut -d'@' -f2)
+          else
+            DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.GHCR_IMAGE }}:$IMAGE_TAG | cut -d'@' -f2)
+          fi
           echo "digest=$DIGEST" >> $GITHUB_OUTPUT
 
       - name: Sign the published Docker image
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ env.HAS_DOCKERHUB == 'true' && github.event_name != 'pull_request' }}
         env:
           IMAGE_TAG: ${{ steps.dockerhub-push.outputs.tag }}
           DIGEST: ${{ steps.dockerhub-push.outputs.digest }}
