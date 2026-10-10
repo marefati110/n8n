@@ -28,11 +28,11 @@ COPY . /src
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     DOCKER_BUILD=true pnpm install --frozen-lockfile
 
-# Build only the runtime dependency graph of the n8n package. The
-# design-system eslint plugin cannot typecheck without its test files,
-# which .dockerignore excludes.
+# Build only the runtime dependency graph of the n8n package. The lint
+# packages are skipped: the design-system plugin cannot typecheck without
+# its test files, which .dockerignore excludes.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    DOCKER_BUILD=true pnpm --filter=n8n... --filter=!@n8n/eslint-plugin-design-system run build
+    DOCKER_BUILD=true pnpm --filter=n8n... --filter='!@n8n/eslint-plugin-design-system' --filter='!@n8n/eslint-config' run build
 
 # Deploy pruned production bundle into ./compiled
 RUN DOCKER_BUILD=true CI=true node scripts/docker-deploy-n8n.mjs
