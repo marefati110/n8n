@@ -66,6 +66,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tini \
     gosu \
     git \
+    openssh-client \
     graphicsmagick \
     && rm -rf /var/lib/apt/lists/*
 
